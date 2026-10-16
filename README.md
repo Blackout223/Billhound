@@ -5,7 +5,7 @@
 
 Detect signs of AWS compromise (crypto-mining, LLMjacking, data theft) hidden in your cloud bill.
 
-- Flags new regions, new GPU instances, abuse-prone services, spend spikes and data egress spikes.
+- Flags new regions, GPU instances, abuse-prone services, disabled security logging, spend spikes and data egress spikes.
 - Ranks findings by severity and cost, with a plain-English reason for each.
 - Reads AWS Cost and Usage Report (CUR 2.0) CSV files and needs no AWS credentials.
 - Exits with code 1 on high-severity findings, for use in scripts and CI.

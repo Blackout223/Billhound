@@ -64,3 +64,21 @@ def test_gpu_family_detection():
     assert is_gpu_instance("p5.48xlarge")
     assert not is_gpu_instance("t3.medium")
     assert not is_gpu_instance("m5.large")
+
+
+def test_stopped_cloudtrail_is_flagged():
+    trail = [row(day, service="AWSCloudTrail", region="global", usage_type="PaidEventsRecorded",
+                 instance_type="", cost=0.5) for day in range(1, 12)]
+    assert "SECURITY_SERVICE_STOPPED" in rules_found(run_all_rules(quiet_month() + trail))
+
+
+def test_running_cloudtrail_is_not_flagged():
+    trail = [row(day, service="AWSCloudTrail", region="global", usage_type="PaidEventsRecorded",
+                 instance_type="", cost=0.5) for day in range(1, 15)]
+    assert "SECURITY_SERVICE_STOPPED" not in rules_found(run_all_rules(quiet_month() + trail))
+
+
+def test_ssm_is_a_high_risk_new_service():
+    rows = quiet_month() + [row(14, service="AWSSystemsManager", instance_type="", cost=15.0)]
+    finding = next(f for f in run_all_rules(rows) if f["rule"] == "NEW_SERVICE")
+    assert finding["severity"] == "HIGH"

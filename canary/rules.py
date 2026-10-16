@@ -17,7 +17,21 @@ HIGH_RISK_SERVICES = {
     "AmazonSageMaker": "can launch GPU machines outside normal EC2 dashboards",
     "AmazonLightsail": "cheap servers often used for mining or phishing",
     "AmazonSES": "used to send phishing and spam from your domain",
+    "AWSSystemsManager": "can run commands on servers without SSH, a known command-and-control route",
+    "AmazonRoute53": "new domains or DNS changes can be used for phishing or traffic redirection",
 }
+
+# Logging and detection services. If one of these stops being billed, someone
+# may have switched it off to hide what they are doing.
+SECURITY_SERVICES = {
+    "AWSCloudTrail": "audit logging",
+    "AmazonGuardDuty": "threat detection",
+    "AWSConfig": "configuration recording",
+    "AWSSecurityHub": "security findings",
+}
+
+# How many of the latest days a security service must be silent before we flag it.
+QUIET_DAYS = 2
 
 # Spending below this many dollars is ignored by the spike rules, so
 # tiny services going from $0.01 to $0.05 don't raise alarms.
@@ -81,6 +95,29 @@ def find_new_services(baseline, recent):
                        + (f"Watch out: {reason}." if reason else "Check that someone expected this.")),
             "cost": _total_cost(service_rows),
         })
+    return findings
+
+
+def find_stopped_security_services(baseline, recent, quiet_days=QUIET_DAYS):
+    """A logging or detection service that was billed before but has gone silent."""
+    last_day = max(row["date"] for row in recent)
+    quiet_from = last_day - timedelta(days=quiet_days - 1)
+    billed_before = {row["service"] for row in baseline if row["cost"] > 0}
+    billed_lately = {row["service"] for row in recent
+                     if row["date"] >= quiet_from and row["cost"] > 0}
+
+    findings = []
+    for service, purpose in SECURITY_SERVICES.items():
+        if service in billed_before and service not in billed_lately:
+            findings.append({
+                "severity": "HIGH",
+                "rule": "SECURITY_SERVICE_STOPPED",
+                "title": f"Security service went silent: {service}",
+                "detail": (f"{service} ({purpose}) was billed before but not in the last "
+                           f"{quiet_days} days. Attackers switch off logging and detection "
+                           "to hide their activity. Check it is still enabled."),
+                "cost": 0.0,
+            })
     return findings
 
 
@@ -191,6 +228,7 @@ def run_all_rules(rows, recent_days=7, multiplier=3.0, min_cost=DEFAULT_MIN_COST
     findings += find_new_regions(baseline, recent)
     findings += find_new_services(baseline, recent)
     findings += find_gpu_instances(baseline, recent)
+    findings += find_stopped_security_services(baseline, recent)
     findings += find_spend_spikes(baseline, recent, multiplier, min_cost)
     findings += find_egress_spikes(baseline, recent, multiplier, min_cost)
 

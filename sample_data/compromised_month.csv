@@ -225,7 +225,6 @@ line_item_usage_start_date,line_item_product_code,product_region_code,line_item_
 2026-09-28T00:00:00Z,AmazonRDS,us-east-1,InstanceUsage:db.t3.medium,db.t3.medium,16.1159
 2026-09-28T00:00:00Z,AWSLambda,us-east-1,Lambda-GB-Second,,1.7343
 2026-09-28T00:00:00Z,AmazonCloudWatch,us-east-1,CW:Requests,,1.5379
-2026-09-28T00:00:00Z,AWSCloudTrail,global,PaidEventsRecorded,,0.5004
 2026-09-28T00:00:00Z,AmazonEC2,sa-east-1,SAE1-BoxUsage:p3.8xlarge,p3.8xlarge,324.0041
 2026-09-28T00:00:00Z,AmazonBedrock,us-west-2,USW2-ModelInvocation-InputTokens,,125.6122
 2026-09-29T00:00:00Z,AmazonEC2,us-east-1,BoxUsage:t3.medium,t3.medium,27.3176
@@ -235,7 +234,6 @@ line_item_usage_start_date,line_item_product_code,product_region_code,line_item_
 2026-09-29T00:00:00Z,AmazonRDS,us-east-1,InstanceUsage:db.t3.medium,db.t3.medium,15.7885
 2026-09-29T00:00:00Z,AWSLambda,us-east-1,Lambda-GB-Second,,1.8411
 2026-09-29T00:00:00Z,AmazonCloudWatch,us-east-1,CW:Requests,,1.3289
-2026-09-29T00:00:00Z,AWSCloudTrail,global,PaidEventsRecorded,,0.5585
 2026-09-29T00:00:00Z,AmazonEC2,sa-east-1,SAE1-BoxUsage:p3.8xlarge,p3.8xlarge,270.6923
 2026-09-29T00:00:00Z,AmazonBedrock,us-west-2,USW2-ModelInvocation-InputTokens,,143.9698
 2026-09-29T00:00:00Z,AmazonS3,us-east-1,DataTransfer-Out-Bytes,,424.6839
@@ -246,7 +244,6 @@ line_item_usage_start_date,line_item_product_code,product_region_code,line_item_
 2026-09-30T00:00:00Z,AmazonRDS,us-east-1,InstanceUsage:db.t3.medium,db.t3.medium,13.6692
 2026-09-30T00:00:00Z,AWSLambda,us-east-1,Lambda-GB-Second,,2.1297
 2026-09-30T00:00:00Z,AmazonCloudWatch,us-east-1,CW:Requests,,1.3824
-2026-09-30T00:00:00Z,AWSCloudTrail,global,PaidEventsRecorded,,0.4844
 2026-09-30T00:00:00Z,AmazonEC2,sa-east-1,SAE1-BoxUsage:p3.8xlarge,p3.8xlarge,308.0916
 2026-09-30T00:00:00Z,AmazonBedrock,us-west-2,USW2-ModelInvocation-InputTokens,,131.5999
 2026-09-30T00:00:00Z,AmazonS3,us-east-1,DataTransfer-Out-Bytes,,387.3898

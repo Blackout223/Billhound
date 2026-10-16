@@ -42,6 +42,9 @@ ATTACK_USAGE = [
     (29, ("AmazonS3", "us-east-1", "DataTransfer-Out-Bytes", "", 410.0)),
 ]
 
+# Services the attacker switches off in the compromised file: {service: first day stopped}
+STOPPED_BY_ATTACKER = {"AWSCloudTrail": 28}
+
 
 def make_row(day, usage, wobble):
     service, region, usage_type, instance_type, daily_cost = usage
@@ -56,7 +59,11 @@ def build_month(include_attack):
     for day_number in range(1, 31):
         day = start + timedelta(days=day_number - 1)
         for usage in NORMAL_USAGE:
-            rows.append(make_row(day, usage, wobble))
+            row = make_row(day, usage, wobble)
+            stopped_on = STOPPED_BY_ATTACKER.get(usage[0])
+            if include_attack and stopped_on and day_number >= stopped_on:
+                continue  # the attacker turned this service off
+            rows.append(row)
         if include_attack:
             for first_day, usage in ATTACK_USAGE:
                 if day_number >= first_day:
