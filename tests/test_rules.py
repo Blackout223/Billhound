@@ -1,7 +1,9 @@
 """Tests for the detection rules. Run with:  python -m pytest"""
 
+import json
 from datetime import date
 
+from canary.report import write_json
 from canary.rules import is_gpu_instance, run_all_rules
 
 
@@ -89,3 +91,12 @@ def test_ecs_is_a_high_risk_new_service():
                                 instance_type="", cost=40.0)]
     finding = next(f for f in run_all_rules(rows) if f["rule"] == "NEW_SERVICE")
     assert finding["severity"] == "HIGH"
+
+
+def test_json_report_can_be_read_back(tmp_path):
+    rows = quiet_month() + [row(14, region="sa-east-1")]
+    output = tmp_path / "report.json"
+    write_json(run_all_rules(rows), "test.csv", output)
+    report = json.loads(output.read_text())
+    assert report["summary"]["high"] == 1
+    assert report["findings"][0]["rule"] == "NEW_REGION"

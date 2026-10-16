@@ -8,7 +8,7 @@ import argparse
 import sys
 
 from canary.loader import load_billing_csv
-from canary.report import print_report, write_markdown
+from canary.report import print_report, write_json, write_markdown
 from canary.rules import run_all_rules
 
 
@@ -24,6 +24,8 @@ def parse_args():
                         help="ignore spikes smaller than this many dollars per day (default: 10)")
     parser.add_argument("--markdown", metavar="FILE",
                         help="also save the report as a Markdown file")
+    parser.add_argument("--json", metavar="FILE",
+                        help="also save the findings as a JSON file")
     return parser.parse_args()
 
 
@@ -39,6 +41,8 @@ def main():
     print_report(findings, args.csv_file)
     if args.markdown:
         write_markdown(findings, args.csv_file, args.markdown)
+    if args.json:
+        write_json(findings, args.csv_file, args.json)
 
     # Exit code 1 when anything HIGH is found, so scripts and CI pipelines can react.
     return 1 if any(f["severity"] == "HIGH" for f in findings) else 0

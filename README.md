@@ -8,7 +8,7 @@ Detect signs of AWS compromise (crypto-mining, LLMjacking, data theft) hidden in
 - Flags new regions, GPU instances, abuse-prone services, disabled security logging, spend spikes and data egress spikes.
 - Ranks findings by severity and cost, with a plain-English reason for each.
 - Reads AWS Cost and Usage Report (CUR 2.0) CSV files and needs no AWS credentials.
-- Exits with code 1 on high-severity findings, for use in scripts and CI.
+- Saves Markdown or JSON reports, and exits with code 1 on high-severity findings for use in scripts and CI.
 
 ## Table of Contents
 
@@ -36,6 +36,9 @@ python costcanary.py sample_data/compromised_month.csv
 
 # Check your own CUR export and save a Markdown report
 python costcanary.py path/to/cur-export.csv --markdown report.md
+
+# Save findings as JSON for a SIEM, Slack bot or dashboard
+python costcanary.py path/to/cur-export.csv --json report.json
 
 # List all options
 python costcanary.py --help

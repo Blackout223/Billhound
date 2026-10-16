@@ -9,6 +9,7 @@ venv/
 
 # Reports you generate locally
 report*.md
+report*.json
 
 # NEVER commit real billing data or AWS credentials
 real_data/
