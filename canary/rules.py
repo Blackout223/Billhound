@@ -19,6 +19,7 @@ HIGH_RISK_SERVICES = {
     "AmazonSES": "used to send phishing and spam from your domain",
     "AWSSystemsManager": "can run commands on servers without SSH, a known command-and-control route",
     "AmazonRoute53": "new domains or DNS changes can be used for phishing or traffic redirection",
+    "AmazonECS": "Fargate containers are a common way to run crypto-miners without managing servers",
 }
 
 # Logging and detection services. If one of these stops being billed, someone

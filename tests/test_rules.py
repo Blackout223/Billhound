@@ -82,3 +82,10 @@ def test_ssm_is_a_high_risk_new_service():
     rows = quiet_month() + [row(14, service="AWSSystemsManager", instance_type="", cost=15.0)]
     finding = next(f for f in run_all_rules(rows) if f["rule"] == "NEW_SERVICE")
     assert finding["severity"] == "HIGH"
+
+
+def test_ecs_is_a_high_risk_new_service():
+    rows = quiet_month() + [row(14, service="AmazonECS", usage_type="USE1-Fargate-vCPU-Hours:perCPU",
+                                instance_type="", cost=40.0)]
+    finding = next(f for f in run_all_rules(rows) if f["rule"] == "NEW_SERVICE")
+    assert finding["severity"] == "HIGH"
