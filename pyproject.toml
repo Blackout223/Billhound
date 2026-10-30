@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "billhound"
+dynamic = ["version"]
+description = "Detect signs of AWS compromise (crypto-mining, LLMjacking, data theft) hidden in your cloud bill."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Blackout" }]
+keywords = ["aws", "cloud-security", "billing", "incident-response", "detection"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Security",
+    "Environment :: Console",
+]
+
+[project.optional-dependencies]
+parquet = ["pyarrow>=14"]
+
+[project.scripts]
+billhound = "hound.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Blackout223/billhound"
+Issues = "https://github.com/Blackout223/billhound/issues"
+
+[tool.setuptools]
+packages = ["hound"]
+
+[tool.setuptools.dynamic]
+version = { attr = "hound.__version__" }

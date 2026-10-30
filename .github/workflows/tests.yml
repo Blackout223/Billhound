@@ -16,6 +16,10 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest
+      - name: Install the package and run the billhound command
+        run: |
+          pip install .
+          billhound --version
       - name: Run on the sample data
         run: |
           python billhound.py sample_data/normal_month.csv

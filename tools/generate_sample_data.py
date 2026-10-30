@@ -13,6 +13,7 @@ from pathlib import Path
 
 COLUMNS = [
     "line_item_usage_start_date",
+    "line_item_usage_account_id",
     "line_item_product_code",
     "product_region_code",
     "line_item_usage_type",
@@ -46,10 +47,14 @@ ATTACK_USAGE = [
 STOPPED_BY_ATTACKER = {"AWSCloudTrail": 28}
 
 
+# The one AWS account in the sample. Real IDs are 12 digits; this is AWS's documentation example.
+ACCOUNT_ID = "111122223333"
+
+
 def make_row(day, usage, wobble):
     service, region, usage_type, instance_type, daily_cost = usage
     cost = daily_cost * wobble.uniform(0.85, 1.15)  # real bills vary a little each day
-    return [f"{day.isoformat()}T00:00:00Z", service, region, usage_type, instance_type, f"{cost:.4f}"]
+    return [f"{day.isoformat()}T00:00:00Z", ACCOUNT_ID, service, region, usage_type, instance_type, f"{cost:.4f}"]
 
 
 def build_month(include_attack):

@@ -1,0 +1,6 @@
+{
+  "regions": ["eu-west-2"],
+  "services": ["AmazonSageMaker"],
+  "instance_types": ["g5.xlarge"],
+  "accounts": ["444455556666"]
+}

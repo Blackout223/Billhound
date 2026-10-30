@@ -1,7 +1,8 @@
 """Detection rules. Each rule looks at the billing rows and returns a list of findings.
 
 A finding is a dictionary:
-    {"severity": "HIGH", "rule": "NEW_REGION", "title": "...", "detail": "...", "cost": 123.45}
+    {"severity": "HIGH", "rule": "NEW_REGION", "title": "...", "detail": "...", "cost": 123.45,
+     "mitre": "T1535"}
 """
 
 from collections import defaultdict
@@ -20,6 +21,25 @@ HIGH_RISK_SERVICES = {
     "AWSSystemsManager": "can run commands on servers without SSH, a known command-and-control route",
     "AmazonRoute53": "new domains or DNS changes can be used for phishing or traffic redirection",
     "AmazonECS": "Fargate containers are a common way to run crypto-miners without managing servers",
+    "AmazonEKS": "Kubernetes clusters let attackers hide mining pods among normal workloads",
+}
+
+# Services where a sudden cost surge is HIGH rather than MEDIUM, because attackers use
+# them for cheap, hard-to-spot compute.
+SURGE_SERVICES = {
+    "AWSLambda": "thousands of short functions can be used for mining or mass scanning",
+}
+
+# The MITRE ATT&CK technique each rule maps to (https://attack.mitre.org).
+MITRE_TECHNIQUES = {
+    "NEW_REGION": "T1535",                  # Unused/Unsupported Cloud Regions
+    "NEW_ACCOUNT": "T1496",                 # Resource Hijacking
+    "NEW_SERVICE": "T1496.004",             # Cloud Service Hijacking
+    "GPU_INSTANCE": "T1496.001",            # Compute Hijacking
+    "SECURITY_SERVICE_STOPPED": "T1562.008",  # Disable or Modify Cloud Logs
+    "SPEND_SPIKE": "T1496",                 # Resource Hijacking
+    "COMPUTE_SURGE": "T1496.001",           # Compute Hijacking
+    "EGRESS_SPIKE": "T1530",                # Data from Cloud Storage
 }
 
 # Logging and detection services. If one of these stops being billed, someone
@@ -54,9 +74,9 @@ def _total_cost(rows):
     return round(sum(row["cost"] for row in rows), 2)
 
 
-def find_new_regions(baseline, recent):
+def find_new_regions(baseline, recent, allowed=()):
     """Spending in a region that had none during the baseline period."""
-    known = {row["region"] for row in baseline if row["cost"] > 0}
+    known = {row["region"] for row in baseline if row["cost"] > 0} | set(allowed)
     new_rows = defaultdict(list)
     for row in recent:
         if row["cost"] > 0 and row["region"] not in known and row["region"] != "global":
@@ -77,9 +97,32 @@ def find_new_regions(baseline, recent):
     return findings
 
 
-def find_new_services(baseline, recent):
+def find_new_accounts(baseline, recent, allowed=()):
+    """Spending in an AWS account that had none during the baseline period."""
+    known = {row["account"] for row in baseline if row["cost"] > 0} | set(allowed)
+    new_rows = defaultdict(list)
+    for row in recent:
+        if row["cost"] > 0 and row["account"] not in known and row["account"] != "unknown":
+            new_rows[row["account"]].append(row)
+
+    findings = []
+    for account, account_rows in new_rows.items():
+        services = sorted({row["service"] for row in account_rows})
+        findings.append({
+            "severity": "HIGH",
+            "rule": "NEW_ACCOUNT",
+            "title": f"New account with spend: {account}",
+            "detail": (f"Account {account} had no spend before. Services: {', '.join(services)}. "
+                       "Attackers with organisation access create or reuse quiet accounts "
+                       "because nobody is watching them."),
+            "cost": _total_cost(account_rows),
+        })
+    return findings
+
+
+def find_new_services(baseline, recent, allowed=()):
     """A service that appears for the first time."""
-    known = {row["service"] for row in baseline if row["cost"] > 0}
+    known = {row["service"] for row in baseline if row["cost"] > 0} | set(allowed)
     new_rows = defaultdict(list)
     for row in recent:
         if row["cost"] > 0 and row["service"] not in known:
@@ -129,9 +172,9 @@ def is_gpu_instance(instance_type):
     return family.startswith(GPU_FAMILIES)
 
 
-def find_gpu_instances(baseline, recent):
+def find_gpu_instances(baseline, recent, allowed=()):
     """GPU instance types that were not running during the baseline period."""
-    known = {row["instance_type"] for row in baseline if row["instance_type"]}
+    known = {row["instance_type"] for row in baseline if row["instance_type"]} | set(allowed)
     new_rows = defaultdict(list)
     for row in recent:
         itype = row["instance_type"]
@@ -175,20 +218,29 @@ def find_spend_spikes(baseline, recent, multiplier, min_cost=DEFAULT_MIN_COST):
             continue  # brand new services are handled by find_new_services
         worst_day, worst_cost = max(day_costs.items(), key=lambda item: item[1])
         if worst_cost >= min_cost and worst_cost >= normal * multiplier:
+            reason = SURGE_SERVICES.get(service)
             findings.append({
-                "severity": "MEDIUM",
-                "rule": "SPEND_SPIKE",
-                "title": f"Spend spike: {service}",
+                "severity": "HIGH" if reason else "MEDIUM",
+                "rule": "COMPUTE_SURGE" if reason else "SPEND_SPIKE",
+                "title": f"{'Compute surge' if reason else 'Spend spike'}: {service}",
                 "detail": (f"On {worst_day} {service} cost ${worst_cost:,.2f}, "
-                           f"{worst_cost / normal:.1f}x its normal ${normal:,.2f} per day."),
+                           f"{worst_cost / normal:.1f}x its normal ${normal:,.2f} per day."
+                           + (f" Watch out: {reason}." if reason else "")),
                 "cost": round(sum(day_costs.values()), 2),
             })
     return findings
 
 
+# Usage type endings that mean data is moving out:
+#   DataTransfer-Out-Bytes   to the internet, e.g. "EUW2-DataTransfer-Out-Bytes"
+#   AWS-Out-Bytes            to another AWS region, e.g. "USE1-USW2-AWS-Out-Bytes"
+#   NatGateway-Bytes         through a NAT gateway, the usual route out of a private network
+EGRESS_USAGE_TYPES = ("DataTransfer-Out-Bytes", "AWS-Out-Bytes", "NatGateway-Bytes")
+
+
 def is_data_egress(usage_type):
-    """CUR usage types like 'DataTransfer-Out-Bytes' or 'EUW2-DataTransfer-Out-Bytes' mean data leaving AWS."""
-    return "DataTransfer-Out-Bytes" in usage_type
+    """True when a usage type means data leaving a region: internet, cross-region or NAT gateway."""
+    return any(marker in usage_type for marker in EGRESS_USAGE_TYPES)
 
 
 def find_egress_spikes(baseline, recent, multiplier, min_cost=DEFAULT_MIN_COST):
@@ -209,8 +261,9 @@ def find_egress_spikes(baseline, recent, multiplier, min_cost=DEFAULT_MIN_COST):
                 "severity": "HIGH",
                 "rule": "EGRESS_SPIKE",
                 "title": f"Data transfer out spike in {region}",
-                "detail": (f"On {worst_day} data leaving AWS from {region} cost ${worst_cost:,.2f}, "
-                           f"{compared}. Large unexpected downloads can mean stolen data."),
+                "detail": (f"On {worst_day} data transfer out of {region} cost ${worst_cost:,.2f}, "
+                           f"{compared}. Large unexpected transfers to the internet, another "
+                           "region or through a NAT gateway can mean stolen data."),
                 "cost": round(sum(day_costs.values()), 2),
             })
     return findings
@@ -219,19 +272,27 @@ def find_egress_spikes(baseline, recent, multiplier, min_cost=DEFAULT_MIN_COST):
 SEVERITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 
-def run_all_rules(rows, recent_days=7, multiplier=3.0, min_cost=DEFAULT_MIN_COST):
-    """Run every rule and return findings, most severe and most expensive first."""
+def run_all_rules(rows, recent_days=7, multiplier=3.0, min_cost=DEFAULT_MIN_COST, allow=None):
+    """Run every rule and return findings, most severe and most expensive first.
+
+    `allow` is an optional allowlist (see loader.load_allowlist): regions, services,
+    instance types and accounts listed there are treated as expected.
+    """
+    allow = allow or {}
     baseline, recent = split_periods(rows, recent_days)
     if not baseline:
         raise ValueError("Not enough history: the file needs more days than --recent-days.")
 
     findings = []
-    findings += find_new_regions(baseline, recent)
-    findings += find_new_services(baseline, recent)
-    findings += find_gpu_instances(baseline, recent)
+    findings += find_new_regions(baseline, recent, allow.get("regions", ()))
+    findings += find_new_accounts(baseline, recent, allow.get("accounts", ()))
+    findings += find_new_services(baseline, recent, allow.get("services", ()))
+    findings += find_gpu_instances(baseline, recent, allow.get("instance_types", ()))
     findings += find_stopped_security_services(baseline, recent)
     findings += find_spend_spikes(baseline, recent, multiplier, min_cost)
     findings += find_egress_spikes(baseline, recent, multiplier, min_cost)
 
+    for finding in findings:
+        finding["mitre"] = MITRE_TECHNIQUES[finding["rule"]]
     findings.sort(key=lambda f: (SEVERITY_ORDER[f["severity"]], -f["cost"]))
     return findings
