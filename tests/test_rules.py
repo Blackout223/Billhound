@@ -3,8 +3,8 @@
 import json
 from datetime import date
 
-from canary.report import write_json
-from canary.rules import is_gpu_instance, run_all_rules
+from hound.report import write_json
+from hound.rules import is_gpu_instance, run_all_rules
 
 
 def row(day, service="AmazonEC2", region="us-east-1", usage_type="BoxUsage:t3.medium",

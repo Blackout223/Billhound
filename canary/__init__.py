@@ -1,3 +1,0 @@
-"""CostCanary: find signs of a cloud breach in billing data."""
-
-__version__ = "0.1.0"

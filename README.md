@@ -1,6 +1,6 @@
-# CostCanary _(costcanary)_
+# BillHound
 
-[![tests](https://github.com/Blackout223/costcanary/actions/workflows/tests.yml/badge.svg)](https://github.com/Blackout223/costcanary/actions/workflows/tests.yml)
+[![tests](https://github.com/Blackout223/billhound/actions/workflows/tests.yml/badge.svg)](https://github.com/Blackout223/billhound/actions/workflows/tests.yml)
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg)](https://github.com/RichardLitt/standard-readme)
 
 Detect signs of AWS compromise (crypto-mining, LLMjacking, data theft) hidden in your cloud bill.
@@ -22,8 +22,8 @@ Detect signs of AWS compromise (crypto-mining, LLMjacking, data theft) hidden in
 Requires [Python](https://www.python.org/downloads/) 3.10 or newer. There are no other dependencies.
 
 ```bash
-git clone https://github.com/Blackout223/costcanary.git
-cd costcanary
+git clone https://github.com/Blackout223/billhound.git
+cd billhound
 ```
 
 ## Usage
@@ -32,23 +32,23 @@ cd costcanary
 
 ```bash
 # Try it on the included sample data
-python costcanary.py sample_data/compromised_month.csv
+python billhound.py sample_data/compromised_month.csv
 
 # Check your own CUR export and save a Markdown report
-python costcanary.py path/to/cur-export.csv --markdown report.md
+python billhound.py path/to/cur-export.csv --markdown report.md
 
 # Save findings as JSON for a SIEM, Slack bot or dashboard
-python costcanary.py path/to/cur-export.csv --json report.json
+python billhound.py path/to/cur-export.csv --json report.json
 
 # List all options
-python costcanary.py --help
+python billhound.py --help
 ```
 
 See the [usage guidelines](docs/guidelines.md) for options, exit codes, limitations and responsible use.
 
 ## Contributing
 
-Questions and bug reports are welcome in [GitHub issues](https://github.com/Blackout223/costcanary/issues).
+Questions and bug reports are welcome in [GitHub issues](https://github.com/Blackout223/billhound/issues).
 Pull requests are accepted. Please make sure `python -m pytest` passes and add a test for any new detection rule.
 
 ## License

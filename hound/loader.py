@@ -3,7 +3,7 @@
 import csv
 from datetime import date
 
-# The CUR 2.0 columns CostCanary needs. Real exports have 100+ columns;
+# The CUR 2.0 columns BillHound needs. Real exports have 100+ columns;
 # we ignore everything else.
 REQUIRED_COLUMNS = [
     "line_item_usage_start_date",

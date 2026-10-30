@@ -1,4 +1,4 @@
-# CostCanary report: `sample_data/compromised_month.csv`
+# BillHound report: `sample_data/compromised_month.csv`
 
 | Severity | Finding | Recent cost | Details |
 |---|---|---:|---|

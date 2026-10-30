@@ -1,4 +1,4 @@
-"""Creates two fake billing files in sample_data/ so anyone can try CostCanary.
+"""Creates two fake billing files in sample_data/ so anyone can try BillHound.
 
 normal_month.csv       a quiet, healthy account
 compromised_month.csv  the same account, but stolen keys are abused in the last 5 days

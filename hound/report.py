@@ -7,7 +7,7 @@ ICONS = {"HIGH": "[!!]", "MEDIUM": "[! ]", "LOW": "[  ]"}
 
 
 def print_report(findings, file_name):
-    print(f"\nCostCanary report for {file_name}")
+    print(f"\nBillHound report for {file_name}")
     print("=" * 60)
     if not findings:
         print("No suspicious spending patterns found.")
@@ -21,7 +21,7 @@ def print_report(findings, file_name):
 
 
 def write_markdown(findings, file_name, output_path):
-    lines = [f"# CostCanary report: `{file_name}`", ""]
+    lines = [f"# BillHound report: `{file_name}`", ""]
     if not findings:
         lines.append("No suspicious spending patterns found.")
     else:
@@ -37,7 +37,7 @@ def write_markdown(findings, file_name, output_path):
 def write_json(findings, file_name, output_path):
     """Save findings as JSON so other tools (SIEMs, Slack bots, dashboards) can read them."""
     report = {
-        "tool": "costcanary",
+        "tool": "billhound",
         "source_file": file_name,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "summary": {

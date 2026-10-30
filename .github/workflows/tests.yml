@@ -18,6 +18,6 @@ jobs:
       - run: python -m pytest
       - name: Run on the sample data
         run: |
-          python costcanary.py sample_data/normal_month.csv
+          python billhound.py sample_data/normal_month.csv
           # The compromised file should exit with code 1 (HIGH findings)
-          python costcanary.py sample_data/compromised_month.csv || test $? -eq 1
+          python billhound.py sample_data/compromised_month.csv || test $? -eq 1

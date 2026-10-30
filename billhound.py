@@ -1,15 +1,15 @@
 """Command-line entry point.
 
 Example:
-    python costcanary.py sample_data/compromised_month.csv --markdown report.md
+    python billhound.py sample_data/compromised_month.csv --markdown report.md
 """
 
 import argparse
 import sys
 
-from canary.loader import load_billing_csv
-from canary.report import print_report, write_json, write_markdown
-from canary.rules import run_all_rules
+from hound.loader import load_billing_csv
+from hound.report import print_report, write_json, write_markdown
+from hound.rules import run_all_rules
 
 
 def parse_args():

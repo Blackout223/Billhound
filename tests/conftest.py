@@ -1,4 +1,4 @@
-# Lets the tests import the "canary" package from the project folder.
+# Lets the tests import the "hound" package from the project folder.
 import sys
 from pathlib import Path
 
