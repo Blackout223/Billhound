@@ -8,10 +8,12 @@ from hound.rules import is_data_egress, is_gpu_instance, run_all_rules
 
 
 def row(day, service="AmazonEC2", region="us-east-1", usage_type="BoxUsage:t3.medium",
-        instance_type="t3.medium", cost=20.0, account="111122223333"):
+        instance_type="t3.medium", cost=20.0, account="111122223333",
+        charge_type="Usage", billing_entity="AWS"):
     """Build one fake billing row. Only pass in the parts a test cares about."""
     return {"date": date(2026, 9, day), "account": account, "service": service, "region": region,
-            "usage_type": usage_type, "instance_type": instance_type, "cost": cost}
+            "usage_type": usage_type, "instance_type": instance_type, "cost": cost,
+            "charge_type": charge_type, "billing_entity": billing_entity}
 
 
 def quiet_month():
@@ -140,3 +142,47 @@ def test_lambda_surge_is_high_severity():
     lam.append(row(14, service="AWSLambda", usage_type="Lambda-GB-Second", instance_type="", cost=60.0))
     finding = next(f for f in run_all_rules(quiet_month() + lam) if f["rule"] == "COMPUTE_SURGE")
     assert finding["severity"] == "HIGH"
+
+
+def test_kms_request_surge_is_a_ransomware_signal():
+    kms = [row(day, service="awskms", usage_type="USE1-KMS-Requests", instance_type="", cost=0.3)
+           for day in range(1, 15)]
+    kms.append(row(14, service="awskms", usage_type="USE1-KMS-Requests", instance_type="", cost=25.0))
+    finding = next(f for f in run_all_rules(quiet_month() + kms) if f["rule"] == "RANSOMWARE_SIGNAL")
+    assert finding["severity"] == "HIGH"
+    assert finding["mitre"] == "T1486"
+
+
+def test_s3_early_delete_is_a_destruction_signal():
+    rows = quiet_month() + [row(14, service="AmazonS3", usage_type="EarlyDelete-SIA",
+                                instance_type="", cost=40.0)]
+    finding = next(f for f in run_all_rules(rows) if f["rule"] == "RANSOMWARE_SIGNAL")
+    assert finding["mitre"] == "T1485"
+
+
+def test_small_kms_wobble_is_not_a_ransomware_signal():
+    kms = [row(day, service="awskms", usage_type="USE1-KMS-Requests", instance_type="", cost=0.3)
+           for day in range(1, 15)]
+    kms.append(row(14, service="awskms", usage_type="USE1-KMS-Requests", instance_type="", cost=0.9))
+    assert "RANSOMWARE_SIGNAL" not in rules_found(run_all_rules(quiet_month() + kms))
+
+
+def test_new_upfront_purchase_is_flagged():
+    rows = quiet_month() + [row(14, service="ComputeSavingsPlans", usage_type="ComputeSP:3yrAllUpfront",
+                                instance_type="", cost=8000.0, charge_type="SavingsPlanUpfrontFee")]
+    finding = next(f for f in run_all_rules(rows) if f["rule"] == "NEW_CHARGE_TYPE")
+    assert finding["severity"] == "HIGH"
+
+
+def test_existing_reserved_instance_fee_is_not_flagged():
+    fees = [row(day, usage_type="HeavyUsage:t3.medium", cost=5.0, charge_type="RIFee")
+            for day in range(1, 15)]
+    assert "NEW_CHARGE_TYPE" not in rules_found(run_all_rules(quiet_month() + fees))
+
+
+def test_new_marketplace_product_is_flagged_once():
+    rows = quiet_month() + [row(14, service="prod-abc123xyz", usage_type="SoftwareUsage",
+                                instance_type="", cost=60.0, billing_entity="AWS Marketplace")]
+    found = [f["rule"] for f in run_all_rules(rows)]
+    assert "NEW_MARKETPLACE_PRODUCT" in found
+    assert "NEW_SERVICE" not in found  # the same product isn't reported twice

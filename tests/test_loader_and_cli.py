@@ -90,3 +90,20 @@ def test_webhook_posts_summary(monkeypatch):
 
 def test_webhook_refuses_plain_http():
     assert not notify.send_webhook("http://hooks.example.com/abc", [], "bill.csv")
+
+
+def test_reads_charge_type_and_billing_entity(tmp_path):
+    path = tmp_path / "export.csv"
+    path.write_text(
+        "line_item_usage_start_date,line_item_product_code,product_region_code,line_item_usage_type,"
+        "product_instance_type,line_item_unblended_cost,line_item_line_item_type,bill_billing_entity\n"
+        "2026-09-01T00:00:00Z,prod-abc123xyz,us-east-1,SoftwareUsage,,60.0,Usage,AWS Marketplace\n")
+    row = load_billing_csv(path)[0]
+    assert row["charge_type"] == "Usage"
+    assert row["billing_entity"] == "AWS Marketplace"
+
+
+def test_charge_type_defaults_when_column_is_missing():
+    row = load_billing_csv(SAMPLE)[0]
+    assert row["charge_type"] == "Usage"
+    assert row["billing_entity"] == "AWS"

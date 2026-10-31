@@ -30,6 +30,28 @@ SURGE_SERVICES = {
     "AWSLambda": "thousands of short functions can be used for mining or mass scanning",
 }
 
+# Usage types that show data being encrypted or destroyed, the two halves of ransomware.
+# (marker in the usage type, service, what it means, MITRE technique)
+RANSOMWARE_USAGE = [
+    ("KMS-Requests", "awskms", "KMS key requests, used to encrypt data", "T1486"),
+    ("Requests-Tier1", "AmazonS3", "S3 write and copy requests, used to rewrite objects encrypted", "T1486"),
+    ("EarlyDelete", "AmazonS3", "S3 early deletion charges, from deleting stored data in bulk", "T1485"),
+]
+
+# Request charges are tiny (a million KMS requests costs about $3), so these rules
+# use a lower floor than the $10 used for spend spikes.
+RANSOMWARE_MIN_COST = 2.0
+
+# Charge types that are one-off or long-term purchases rather than normal usage.
+# Attackers use them to burn money quickly, and they are hard to undo.
+RISKY_CHARGE_TYPES = {
+    "Fee": "one-off fees such as domain registrations or support plan upgrades",
+    "RIFee": "Reserved Instance purchases commit the account to paying for up to 3 years",
+    "SavingsPlanUpfrontFee": "upfront Savings Plan purchases can cost thousands at once and can't be cancelled",
+}
+
+MARKETPLACE_ENTITY = "AWS Marketplace"
+
 # The MITRE ATT&CK technique each rule maps to (https://attack.mitre.org).
 MITRE_TECHNIQUES = {
     "NEW_REGION": "T1535",                  # Unused/Unsupported Cloud Regions
@@ -40,6 +62,9 @@ MITRE_TECHNIQUES = {
     "SPEND_SPIKE": "T1496",                 # Resource Hijacking
     "COMPUTE_SURGE": "T1496.001",           # Compute Hijacking
     "EGRESS_SPIKE": "T1530",                # Data from Cloud Storage
+    "RANSOMWARE_SIGNAL": "T1486",           # Data Encrypted for Impact (T1485 for deletion)
+    "NEW_CHARGE_TYPE": "T1496",             # Resource Hijacking (closest match)
+    "NEW_MARKETPLACE_PRODUCT": "T1496.004",  # Cloud Service Hijacking
 }
 
 # Logging and detection services. If one of these stops being billed, someone
@@ -125,6 +150,8 @@ def find_new_services(baseline, recent, allowed=()):
     known = {row["service"] for row in baseline if row["cost"] > 0} | set(allowed)
     new_rows = defaultdict(list)
     for row in recent:
+        if row.get("billing_entity") == MARKETPLACE_ENTITY:
+            continue  # Marketplace products are handled by find_new_marketplace_products
         if row["cost"] > 0 and row["service"] not in known:
             new_rows[row["service"]].append(row)
 
@@ -269,6 +296,79 @@ def find_egress_spikes(baseline, recent, multiplier, min_cost=DEFAULT_MIN_COST):
     return findings
 
 
+def find_ransomware_signals(baseline, recent, multiplier, min_cost=RANSOMWARE_MIN_COST):
+    """A surge in the requests ransomware needs: encrypting with KMS, rewriting or deleting S3 data."""
+    findings = []
+    for marker, service, meaning, technique in RANSOMWARE_USAGE:
+        def matches(row):
+            return row["service"] == service and marker in row["usage_type"]
+
+        before = _daily_totals([row for row in baseline if matches(row)], "region")
+        after = _daily_totals([row for row in recent if matches(row)], "region")
+        for region, day_costs in after.items():
+            normal = _average_daily(before.get(region, {}))
+            worst_day, worst_cost = max(day_costs.items(), key=lambda item: item[1])
+            if worst_cost >= min_cost and (normal == 0 or worst_cost >= normal * multiplier):
+                compared = f"{worst_cost / normal:.1f}x the normal ${normal:,.2f}" if normal else "with none before"
+                findings.append({
+                    "severity": "HIGH",
+                    "rule": "RANSOMWARE_SIGNAL",
+                    "title": f"Possible ransomware activity in {region}: {meaning.split(',')[0]}",
+                    "detail": (f"On {worst_day} {meaning} cost ${worst_cost:,.2f} in {region}, "
+                               f"{compared}. Check for objects being re-encrypted with an unknown "
+                               "KMS key or deleted in bulk."),
+                    "cost": round(sum(day_costs.values()), 2),
+                    "mitre": technique,
+                })
+    return findings
+
+
+def find_new_charge_types(baseline, recent):
+    """A one-off or upfront purchase type that never appeared before, such as a Savings Plan bought outright."""
+    known = {row.get("charge_type", "Usage") for row in baseline}
+    new_rows = defaultdict(list)
+    for row in recent:
+        charge_type = row.get("charge_type", "Usage")
+        if charge_type in RISKY_CHARGE_TYPES and charge_type not in known and row["cost"] > 0:
+            new_rows[charge_type].append(row)
+
+    findings = []
+    for charge_type, charge_rows in new_rows.items():
+        services = sorted({row["service"] for row in charge_rows})
+        findings.append({
+            "severity": "HIGH",
+            "rule": "NEW_CHARGE_TYPE",
+            "title": f"New kind of charge: {charge_type}",
+            "detail": (f"The bill has {charge_type} charges for the first time "
+                       f"({', '.join(services)}). Watch out: {RISKY_CHARGE_TYPES[charge_type]}. "
+                       "Check someone in finance or engineering made this purchase."),
+            "cost": _total_cost(charge_rows),
+        })
+    return findings
+
+
+def find_new_marketplace_products(baseline, recent, allowed=()):
+    """Software bought through AWS Marketplace that was not bought before."""
+    known = {row["service"] for row in baseline
+             if row.get("billing_entity") == MARKETPLACE_ENTITY} | set(allowed)
+    new_rows = defaultdict(list)
+    for row in recent:
+        if row.get("billing_entity") == MARKETPLACE_ENTITY and row["cost"] > 0 and row["service"] not in known:
+            new_rows[row["service"]].append(row)
+
+    findings = []
+    for product, product_rows in new_rows.items():
+        findings.append({
+            "severity": "HIGH",
+            "rule": "NEW_MARKETPLACE_PRODUCT",
+            "title": f"New AWS Marketplace subscription: {product}",
+            "detail": ("Software from another seller is being billed to this account for the first time. "
+                       "Attackers subscribe to paid machine images and AI models with stolen keys."),
+            "cost": _total_cost(product_rows),
+        })
+    return findings
+
+
 SEVERITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 
@@ -291,8 +391,11 @@ def run_all_rules(rows, recent_days=7, multiplier=3.0, min_cost=DEFAULT_MIN_COST
     findings += find_stopped_security_services(baseline, recent)
     findings += find_spend_spikes(baseline, recent, multiplier, min_cost)
     findings += find_egress_spikes(baseline, recent, multiplier, min_cost)
+    findings += find_ransomware_signals(baseline, recent, multiplier)
+    findings += find_new_charge_types(baseline, recent)
+    findings += find_new_marketplace_products(baseline, recent, allow.get("services", ()))
 
     for finding in findings:
-        finding["mitre"] = MITRE_TECHNIQUES[finding["rule"]]
+        finding.setdefault("mitre", MITRE_TECHNIQUES[finding["rule"]])
     findings.sort(key=lambda f: (SEVERITY_ORDER[f["severity"]], -f["cost"]))
     return findings

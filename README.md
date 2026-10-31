@@ -5,7 +5,7 @@
 
 Detect signs of AWS compromise (crypto-mining, LLMjacking, data theft) hidden in your cloud bill.
 
-- Flags new regions and accounts, GPU instances, abuse-prone services, disabled security logging, compute surges and data egress spikes.
+- Flags crypto-mining, LLMjacking, data theft, ransomware activity, disabled security logging and unexpected purchases, across regions and accounts.
 - Maps every finding to MITRE ATT&CK and explains it in plain English, with an allowlist for what you expect.
 - Reads AWS Cost and Usage Report (CUR 2.0) exports as CSV, gzipped CSV or Parquet, and needs no AWS credentials.
 - Saves Markdown or JSON reports, posts Slack alerts, and exits with code 1 on high-severity findings.
@@ -41,6 +41,9 @@ Each run splits the data into a baseline (everything before the last 7 days) and
 | `SECURITY_SERVICE_STOPPED` | CloudTrail, GuardDuty, Config or Security Hub was billed before but not in the last 2 days | HIGH | [T1562.008](https://attack.mitre.org/techniques/T1562/008/) Disable or Modify Cloud Logs, [T1562.001](https://attack.mitre.org/techniques/T1562/001/) Disable or Modify Tools | Free tier usage, or a service moved to another account |
 | `SPEND_SPIKE` | A service's daily spend reaching 3x its baseline daily average and at least $10 | MEDIUM | [T1496](https://attack.mitre.org/techniques/T1496/) Resource Hijacking | Load tests, migrations, month-end batch jobs |
 | `COMPUTE_SURGE` | The same spike on a service attackers use for cheap distributed compute (Lambda) | HIGH | [T1496.001](https://attack.mitre.org/techniques/T1496/001/) Compute Hijacking | A real traffic peak or a new event-driven job |
+| `RANSOMWARE_SIGNAL` | A surge in KMS key requests or S3 write and copy requests (data being encrypted), or S3 early deletion charges (data being deleted in bulk). The floor is $2 a day because request charges are small | HIGH | [T1486](https://attack.mitre.org/techniques/T1486/) Data Encrypted for Impact, [T1485](https://attack.mitre.org/techniques/T1485/) Data Destruction | Key rotation, a large data migration, lifecycle rules moving data |
+| `NEW_CHARGE_TYPE` | A one-off or upfront purchase type never seen before: `Fee`, `RIFee` or `SavingsPlanUpfrontFee` | HIGH | [T1496](https://attack.mitre.org/techniques/T1496/) Resource Hijacking (closest match) | A planned Reserved Instance or Savings Plan purchase |
+| `NEW_MARKETPLACE_PRODUCT` | Software from an AWS Marketplace seller billed for the first time | HIGH | [T1496.004](https://attack.mitre.org/techniques/T1496/004/) Cloud Service Hijacking | A team subscribing to a tool they need |
 | `EGRESS_SPIKE` | Data transfer out of a region (to the internet, to another region or through a NAT gateway) reaching 3x its normal daily cost and at least $10, or appearing for the first time | HIGH | [T1530](https://attack.mitre.org/techniques/T1530/) Data from Cloud Storage | Backups to another provider, a big release download |
 
 The 3x multiplier, $10 minimum and 7-day window can all be changed with command line options. Regions, services, instance types and accounts you expect can go in an [allowlist file](docs/allowlist.example.json) so they don't raise alerts. The $10 minimum is there so a service going from $0.01 to $0.05 a day doesn't raise an alert.
@@ -84,6 +87,7 @@ The full report is in [docs/example-report.md](docs/example-report.md).
 - Billing data can be up to 24 hours behind, so this won't catch something in real time.
 - It needs at least one to two weeks of history to build a baseline.
 - A careful attacker who stays in regions and services the account already uses, and keeps spend low, won't trigger the rules.
+- S3 delete requests are free, so mass deletion only shows up when it triggers early deletion charges on Infrequent Access or Glacier storage.
 - Every finding is a lead to investigate, not proof of compromise.
 
 ## Install

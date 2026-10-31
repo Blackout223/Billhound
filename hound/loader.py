@@ -21,6 +21,10 @@ REQUIRED_COLUMNS = [
 
 # Read if present. Single-account exports may leave it out.
 ACCOUNT_COLUMN = "line_item_usage_account_id"
+# Also optional. "Usage" for normal charges, or "Fee", "RIFee", "SavingsPlanUpfrontFee" and so on.
+CHARGE_TYPE_COLUMN = "line_item_line_item_type"
+# Also optional. "AWS", or "AWS Marketplace" for software bought from other sellers.
+BILLING_ENTITY_COLUMN = "bill_billing_entity"
 
 # What an allowlist file may contain. Each key is a list of things you expect to see.
 ALLOWLIST_KEYS = ("regions", "services", "instance_types", "accounts")
@@ -73,6 +77,8 @@ def load_billing_csv(path):
             rows.append({
                 "date": _to_date(raw["line_item_usage_start_date"]),
                 "account": _text(raw.get(ACCOUNT_COLUMN)) or "unknown",
+                "charge_type": _text(raw.get(CHARGE_TYPE_COLUMN)) or "Usage",
+                "billing_entity": _text(raw.get(BILLING_ENTITY_COLUMN)) or "AWS",
                 "service": _text(raw["line_item_product_code"]),
                 "region": _text(raw["product_region_code"]) or "global",
                 "usage_type": _text(raw["line_item_usage_type"]),

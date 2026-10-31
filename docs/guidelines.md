@@ -16,7 +16,13 @@
 
 Only these columns are read: `line_item_usage_start_date`, `line_item_product_code`,
 `product_region_code`, `line_item_usage_type`, `product_instance_type`, `line_item_unblended_cost`.
-`line_item_usage_account_id` is also read when present, which turns on the `NEW_ACCOUNT` rule.
+These optional columns are also read when present:
+
+| Column | Turns on |
+|---|---|
+| `line_item_usage_account_id` | `NEW_ACCOUNT` |
+| `line_item_line_item_type` | `NEW_CHARGE_TYPE` |
+| `bill_billing_entity` | `NEW_MARKETPLACE_PRODUCT` |
 
 ## Allowlist
 
@@ -68,6 +74,8 @@ Slack incoming webhooks accept. Other chat tools may need a different format.
 
 - Billing data can arrive up to 24 hours late.
 - At least one to two weeks of history is needed for a baseline.
+- `RANSOMWARE_SIGNAL` uses a fixed $2 a day floor rather than `--min-cost`, because request charges are small.
+- S3 delete requests are free, so plain deletes don't show in the bill. Only early deletion charges on Infrequent Access and Glacier storage do.
 
 ## Running the tests
 
